@@ -13,6 +13,7 @@ def clean_birthday(text: str) -> str:
     3. If parsing succeeds, reformats the date to YYYY-MM-DD.
     4. Validates that the resulting date is not in the future (i.e., on or before today's date).
     5. Validates that the date is plausible (e.g., year reasonable for a living person, typically 1900 or later).
+    6. Validates that the date is complete (e.g., No February 30)
 
     Parameters
     ----------
@@ -43,6 +44,6 @@ def clean_birthday(text: str) -> str:
     '1990-05-15'
     >>> clean_birthday("2030-01-01")  # Future date
     # Raises ValueError: Birthday cannot be in the future
-    >>> clean_birthday("invalid")
+    >>> clean_birthday("February 30")
     # Raises ValueError: Unable to parse date
     """
