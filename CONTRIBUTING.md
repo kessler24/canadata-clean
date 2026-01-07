@@ -1,3 +1,9 @@
+## Acknowledgments
+
+This project was created by adapting a Python package template generated with [Copier](https://copier.readthedocs.io/).
+
+The original template provided the initial project structure, tooling (Hatch), and contributing guidelines. We modified and extended it to fit the needs of our **canadata-clean** project, which focuses on standardizing Canadian data formats.
+
 # Contributing
 
 Contributions of all kinds are welcome here, and they are greatly appreciated!
