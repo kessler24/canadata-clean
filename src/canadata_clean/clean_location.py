@@ -22,7 +22,7 @@ names_and_abbreviations = {
     "YT": ["yt", "yukon", "yuk.", "yn", "yk"]
 }
 
-def clean_location(text: str):
+def clean_location(text: str, threshold = 85):
     """
     Identify a free-text entry representing a province or territory in Canada using fuzzy matching and return the two letter unique identifier.
     
@@ -34,6 +34,8 @@ def clean_location(text: str):
     ----------
     text : str
         The input string representing a province/territory in Canada.
+    threshold : int
+        The baseline cutoff threshold for accepting a fuzzy match, up to 100 (perfect match). Default is 85.
 
     Returns
     -------
@@ -66,7 +68,14 @@ def clean_location(text: str):
     if not text:
         raise ValueError("Text cannot be empty.")
     
-    return identify_province_territory(text)
+    predictions = score_predictions(text, names_and_abbreviations)
+    
+    max_key, max_value = get_max(predictions)
+
+    if isinstance(max_key, str) and max_value > threshold:
+        return max_key
+    else:
+        return try_variations(text, threshold)
 
 def remove_punctuation(text: str) -> str:
     """
@@ -280,36 +289,3 @@ def score_predictions(text: str, names: dict, scorer = fuzz.ratio):
         predictions[key] = best
 
     return predictions
-
-def identify_province_territory(text: str, threshold: int = 85):
-    """
-    Identify the most likely Canadian province or territory from a text input.
-
-    This function first attempts strict fuzzy matching, then falls back to more
-    permissive matching strategies if confidence is low or ambiguous.
-
-    Parameters
-    ----------
-    text : str
-        Normalized input string.
-    threshold : int, optional
-        Fuzzy matching threshold for accepting non-exact matches (default is 85).
-
-    Returns
-    -------
-    str
-        The identified province/territory code.
-
-    Raises
-    ------
-    ValueError
-        If no unique province or territory can be identified.
-    """
-    predictions = score_predictions(text, names_and_abbreviations)
-    
-    max_key, max_value = get_max(predictions)
-
-    if isinstance(max_key, str) and max_value > threshold:
-        return max_key
-    else:
-        return try_variations(text, threshold)

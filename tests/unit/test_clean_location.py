@@ -1,17 +1,20 @@
 """
-A test module for the location cleaning functions.
+A test module for the location cleaning function.
 """
 import pytest
 import re
 from canadata_clean.clean_location import clean_location
 from canadata_clean.clean_location import remove_punctuation
 from canadata_clean.clean_location import remove_spaces
-
-
+from canadata_clean.clean_location import normalize_names
+from canadata_clean.clean_location import score_predictions
+from canadata_clean.clean_location import get_max
+from canadata_clean.clean_location import try_variation
+from canadata_clean.clean_location import try_variations
 
 def test_clean_location():
     """
-    Run the following tests to ensure that the clean_location function works as expected.
+    Run the following tests to test the clean_location function.
     """
 
     empty()
@@ -162,10 +165,10 @@ def unidentified_province_territory():
     with pytest.raises(ValueError):
         clean_location("b colum")
 
-# Added additional tests for remove_punctuation and remove_spaces helper functions as suggested by ChatGPT. I wrote the tests myself: ChatGPT only provided the suggestion that I test these functions independently.
+# Added additional tests for helper functions as suggested by ChatGPT. I wrote the tests myself: ChatGPT only provided the suggestion that I test these functions independently.
 def test_remove_punctuation():
     """
-    Test that the helper function remove_punctuation works as expected.
+    Test that the helper function remove_punctuation removes all punctuation in the string.
     """
     assert remove_punctuation("P.E.I.") == "PEI"
     assert remove_punctuation("N.-W.-T.") == "NWT"
@@ -174,7 +177,86 @@ def test_remove_punctuation():
 
 def test_remove_spaces():
     """
-    Test that the helper function remove_spaces works as expected.
+    Test that the helper function remove_spaces removes all spaces in the string.
     """
     assert remove_spaces("newfoundland and labrador") == "newfoundlandandlabrador"
     assert remove_spaces("newfoundland and      labrador") == "newfoundlandandlabrador"
+
+def test_normalize_names():
+    """
+    Test that the helper function normalize_names applie the correct function and does not
+    do any other modifications to the dictionary.
+    """
+    names = {
+        "AB": ["alberta", "alta."],
+        "BC": ["british columbia"],
+        "ON": ["ont.", "ontario"]
+    }
+    out = normalize_names(names, remove_spaces)
+
+    assert set(out.keys()) == {"AB", "BC", "ON"}
+    assert len(out["AB"]) == 2
+    assert len(out["BC"]) == 1
+    assert out["BC"][0] == "britishcolumbia"
+
+def test_score_predictions():
+    """
+    Test that the helper function score_predictions gives a score of 100
+    for an exact match and a score less than 100 for a non-match.
+    """
+    names = {"ON": ["ont.", "ontario"], "BC": ["british columbia"]}
+    out = score_predictions("ontario", names)
+
+    assert out["ON"] == 100
+    assert out["BC"] < 100
+    assert set(out.keys()) == {"ON", "BC"}
+
+def test_get_max():
+    """
+    Test that the helper function get_max returns the maximum key and value if there
+    is one maximum, and the maximum keys and value if there are multiple keys tied for
+    maximum.
+    """
+    # one maximum
+    preds = {"ON": 90, "BC": 80}
+    key, value = get_max(preds)
+
+    assert key == "ON"
+    assert value == 90
+
+    # tied keys
+    preds = {"ON": 90, "BC": 90}
+    keys, value = get_max(preds)
+
+    assert set(keys) == {"ON", "BC"}
+    assert value == 90
+
+def test_try_variation():
+    """
+    Test that the helper function try_variation applies the specified function and returns 
+    the appropriate key if a match is found, and returns 'No Match' if a match is not found.
+    """
+    # should match properly
+    assert try_variation("b.c.", remove_punctuation, threshold=85) == "BC"
+    # should not match
+    assert try_variation("notaprovince", remove_punctuation, threshold=85) == "No Match"
+    # should not match because threshold is too high
+    assert try_variation("albrta", remove_punctuation, threshold=98) == "No Match"
+
+def test_try_variations():
+    """
+    Test that the helper function try_variations returns the appropriate key if a match is found
+    and raises a ValueError if no match is found.
+    """
+    # should match
+    assert try_variations("b.c.", threshold=85) == "BC"
+    assert try_variations("newfoundlandandlabrador", threshold=85) == "NL"
+    assert try_variations("north west territor", threshold=85) == "NT"
+
+    # should raise ValueError because no match
+    with pytest.raises(ValueError):
+        try_variations("b", threshold=85)
+
+    # should raise ValueError because no match
+    with pytest.raises(ValueError):
+        try_variations("notaprovince", threshold=85)
