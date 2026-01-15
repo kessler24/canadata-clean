@@ -1,13 +1,9 @@
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../"))
-
 import pytest
-from src.canadata_clean.clean_date import clean_date
+from canadata_clean.clean_date import clean_date
 
 def test_valid_date_formats():
     """Test various valid date formats and conversions, covering 4 edge cases: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, and single-digit handling."""
-    # YYYY-MM-DD (already correct)
+    # YYYY-MM-DD 
     assert clean_date("1990-05-15") == "1990-05-15"
     # DD/MM/YYYY conversion
     assert clean_date("15/05/1990") == "1990-05-15"
