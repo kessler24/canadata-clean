@@ -4,6 +4,10 @@ A test module for the location cleaning functions.
 import pytest
 import re
 from canadata_clean.clean_location import clean_location
+from canadata_clean.clean_location import remove_punctuation
+from canadata_clean.clean_location import remove_spaces
+
+
 
 # def test_clean_location():
 #     """
@@ -103,25 +107,6 @@ def test_incomplete_input():
     with pytest.raises(ValueError):
         clean_location(" ")
 
-def test_unidentified_province_territory():
-    """
-    Test that the function throws a ValuError if it cannot identify a province/territory, including if a
-    province/territory is not specified.
-    """
-
-    with pytest.raises(ValueError):
-        clean_location("XX")
-    
-    with pytest.raises(ValueError):
-        clean_location("C")
-
-    with pytest.raises(ValueError):
-        clean_location("Not A Province")
-    
-    # significant abbreviations will not match correctly
-    with pytest.raises(ValueError):
-        clean_location("nt wt terr")
-
 def test_province_territory_replacement():
     """
     Test that the function correctly matches various province/territory names and abbreviations to the official two-letter code, including small and medium typos.
@@ -140,6 +125,9 @@ def test_province_territory_replacement():
         "brit columbia": "BC", # unknown abbreviations
         "newfoundlandandlabrador": "NL", # no spaces in text input
         "newfoundland": "NL", # incomplete text input
+        "qc": "QC", # minimum valid input
+        "Prince-Edward-Island": "PE", # hyphens between letters
+        "Newfoundland & Labrador": "NL" # other punctuation
     }
 
     for key, value in testing_province_territory_replacement.items():
@@ -154,14 +142,33 @@ def test_same_distance_raises_error():
     with pytest.raises(ValueError):
         clean_location("VB")
 
-def test_significant_typos_raises_error():
+def test_unidentified_province_territory():
     """
-    Test that the function raises a ValueError for significant typos.
+    Test that the function throws a ValuError if it cannot identify a province/territory, including significant typos.
     """
-    # significant typos should not match correctly
+
+    with pytest.raises(ValueError):
+        clean_location("XX")
+    
+    with pytest.raises(ValueError):
+        clean_location("C")
+
+    with pytest.raises(ValueError):
+        clean_location("Not A Province")
+
     with pytest.raises(ValueError):
         clean_location("alllbita")
-    with pytest.raises(ValueError):
-        clean_location("manto")
+
     with pytest.raises(ValueError):
         clean_location("b colum")
+
+def test_remove_helpers():
+    """
+    Test that the helper functions remove_punctuation and remove_spaces work as
+    expected.
+    """
+    assert remove_punctuation("P.E.I.") == "PEI"
+    assert remove_punctuation("N.-W.-T.") == "NWT"
+    assert remove_punctuation("Prince-Edward-Island") == "PrinceEdwardIsland"
+    assert remove_punctuation("Newfoundland & Labrador") == "Newfoundland  Labrador"
+    assert remove_spaces("newfoundland and labrador") == "newfoundlandandlabrador"

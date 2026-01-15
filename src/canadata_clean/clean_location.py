@@ -1,7 +1,8 @@
 from thefuzz import fuzz
+import string
 
 """
-names_and_abbreviations adapted from the following sources:
+The data for names_and_abbreviations was adapted from the following sources:
 https://en.wikipedia.org/wiki/Canadian_postal_abbreviations_for_provinces_and_territories
 https://www.noslangues-ourlanguages.gc.ca/en/writing-tips-plus/abbreviations-canadian-provinces-and-territories
 """
@@ -11,9 +12,9 @@ names_and_abbreviations = {
     "MB": ["mb", "manitoba", "man."],
     "NB": ["nb", "new brunswick", "n.-b."],
     "NL": ["nl", "newfoundland and labrador", "nfld.", "lab.", "t.-n.-l.", "newfoundland", "labrador", "nfld. lab."],
-    "NT": ["nt", "northwest Ttrritories", "northwest territory", "north west territories", "north west territory", "nw territories", "nw territory", "n.w.t", "t.n.-o.", "nw"],
+    "NT": ["nt", "northwest territories", "northwest territory", "north west territories", "north west territory", "nw territories", "nw territory", "n.w.t", "t.n.-o.", "nw"],
     "NS": ["ns", "nova scotia", "n.-e"],
-    "NU": ["nu", "nunavut", "nvt.", "nt"],
+    "NU": ["nu", "nunavut", "nvt."],
     "ON": ["on", "ontario", "ont."],
     "PE": ["pe", "prince edward island", "prince edward", "p.e.i", "i.-p.-e."],
     "QC": ["qc", "quebec", "que.", "pq"],
@@ -67,15 +68,82 @@ def clean_location(text: str):
     
     return identify_province_territory(text)
 
-def remove_periods(text: str) -> str:
-    return text.replace(".", "")
+def remove_punctuation(text: str) -> str:
+    """
+    Remove all ASCII punctuation characters from a string.
+
+    This function strips characters defined in ``string.punctuation`` while
+    preserving letters, numbers, and whitespace. It is used as a normalization
+    step prior to fuzzy matching, in the event that significant punctuation prevented
+    a match in the first round of matching.
+
+    Parameters
+    ----------
+    text : str
+        Input string to normalize.
+
+    Returns
+    -------
+    str
+        The input string with all punctuation removed.
+
+    Examples
+    --------
+    >>> remove_punctuation("P.E.I.")
+    'PEI'
+    """
+    return text.translate(str.maketrans("", "", string.punctuation))
 
 def remove_spaces(text: str) -> str:
+    """
+    Remove all space characters from a string.
+
+    This function is used to handle inputs where province or territory names
+    may be concatenated without spaces and previous fuzzy matching attempts
+    have not found a match.
+
+    Parameters
+    ----------
+    text : str
+        Input string to normalize.
+
+    Returns
+    -------
+    str
+        The input string with all spaces removed.
+
+    Examples
+    --------
+    >>> remove_spaces("newfoundland and labrador")
+    'newfoundlandandlabrador'
+    """
+
     return text.replace(" ", "")
 
 def normalize_names(names: dict, function) -> dict:
     """
-    Apply a string transform to every abbreviation in the dictionary.
+    Apply a string normalization function to all values in a mapping.
+
+    This helper applies a transformation (e.g., removing punctuation or spaces)
+    to every abbreviation or name associated with each province or territory in
+    the names_and_abbreviations dictionary.
+
+    Parameters
+    ----------
+    names : dict
+        Dictionary mapping province/territory codes to lists of name variants.
+    function : callable
+        A function that takes a string and returns a transformed string.
+
+    Returns
+    -------
+    dict
+        A new dictionary with the same keys as ``names`` and transformed values.
+
+    Examples
+    --------
+    >>> normalize_names({"ON": ["ont.", "ontario"]}, remove_punctuation)
+    {'ON': ['ont', 'ontario']}
     """
     return {
         key: [function(v) for v in values]
@@ -83,7 +151,28 @@ def normalize_names(names: dict, function) -> dict:
     }
 
 def try_variation(text:str, function, threshold: int):
-    text = remove_periods(text)
+    """
+    Attempt to identify a province or territory using a specific normalization strategy.
+
+    This applies the specified function to both the input text and the names dictionary, then scores fuzzy matches against the dictionary.
+
+    Parameters
+    ----------
+    text : str
+        Input string.
+    function : callable
+        A normalization function applied to the input string and the names
+        dictionary.
+    threshold : int
+        Minimum fuzzy match score required to accept a result.
+
+    Returns
+    -------
+    str
+        The identified province/territory code if a confident match is found,
+        otherwise the string "No Match".
+    """
+    text = function(text)
     names = normalize_names(names_and_abbreviations, function)
     predictions = score_predictions(text, names)
     max_key, max_value = get_max(predictions)
@@ -94,7 +183,32 @@ def try_variation(text:str, function, threshold: int):
         return "No Match"
 
 def try_variations(text:str , threshold: int):
-    result = try_variation(text, remove_periods, threshold)
+    """
+    Attempt multiple normalization and fuzzy-matching strategies in sequence.
+
+    This function tries increasingly permissive matching approaches, including
+    punctuation removal, space removal, and partial fuzzy matching. It raises
+    an error if no unique province or territory can be identified after all three
+    matching strategies.
+
+    Parameters
+    ----------
+    text : str
+        Normalized input string.
+    threshold : int
+        Base fuzzy matching threshold.
+
+    Returns
+    -------
+    str
+        The identified province/territory code.
+
+    Raises
+    ------
+    ValueError
+        If no unique province or territory can be identified.
+    """
+    result = try_variation(text, remove_punctuation, threshold)
     if result != "No Match":
         return result
     
@@ -112,6 +226,20 @@ def try_variations(text:str , threshold: int):
     raise ValueError(f"No unique province/territory identified for '{text}'.")
 
 def get_max(predictions: dict):
+    """
+    Identify the key(s) associated with the maximum value in a dictionary.
+
+    Parameters
+    ----------
+    predictions : dict
+        Dictionary mapping keys to numeric scores.
+
+    Returns
+    -------
+    tuple
+        If a unique maximum exists, returns (key, value).
+        If multiple keys share the maximum value, returns (list_of_keys, value).
+    """
     max_value = max(predictions.values())
     max_keys = [k for k, v in predictions.items() if v == max_value]
 
@@ -120,22 +248,27 @@ def get_max(predictions: dict):
     else:
         return max_keys[0], max_value
 
-def identify_province_territory(text: str, threshold: int = 90):
-
-    predictions = score_predictions(text, names_and_abbreviations)
-    
-    max_value = max(predictions.values())
-    max_keys = [k for k, v in predictions.items() if v == max_value]
-
-    if max_value < 80:
-        return try_variations(text, threshold)
-    else:
-        if len(max_keys) == 1:
-            return max_keys[0]
-        else:
-            return try_variations(text, threshold)
-
 def score_predictions(text: str, names: dict, scorer = fuzz.ratio):
+    """
+    Compute fuzzy matching scores between an input string and reference dictionary.
+
+    For each province or territory, the highest fuzzy match score across all
+    associated name variants is retained.
+
+    Parameters
+    ----------
+    text : str
+        Input string to match.
+    names : dict
+        Dictionary mapping province/territory codes to lists of name variants.
+    scorer : callable, optional
+        Fuzzy matching function from ``thefuzz`` (default is ``fuzz.ratio``).
+
+    Returns
+    -------
+    dict
+        Dictionary mapping province/territory codes to their best match score.
+    """
     predictions = {}
 
     for key, values in names.items():
@@ -147,3 +280,36 @@ def score_predictions(text: str, names: dict, scorer = fuzz.ratio):
         predictions[key] = best
 
     return predictions
+
+def identify_province_territory(text: str, threshold: int = 85):
+    """
+    Identify the most likely Canadian province or territory from a text input.
+
+    This function first attempts strict fuzzy matching, then falls back to more
+    permissive matching strategies if confidence is low or ambiguous.
+
+    Parameters
+    ----------
+    text : str
+        Normalized input string.
+    threshold : int, optional
+        Fuzzy matching threshold for accepting non-exact matches (default is 85).
+
+    Returns
+    -------
+    str
+        The identified province/territory code.
+
+    Raises
+    ------
+    ValueError
+        If no unique province or territory can be identified.
+    """
+    predictions = score_predictions(text, names_and_abbreviations)
+    
+    max_key, max_value = get_max(predictions)
+
+    if isinstance(max_key, str) and max_value > threshold:
+        return max_key
+    else:
+        return try_variations(text, threshold)
