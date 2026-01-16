@@ -24,29 +24,29 @@ $ pip install canadata-clean
 To use canadata-clean in your code:
 
 ```python
-import canadata_clean
+from canadata_clean import clean_date, clean_location, clean_phonenumber, clean_postalcode
 ```
 
 ### Functions
 ```python
-clean_date.clean_date(date)
+clean_date(date)
 ```
 This function cleans and validates a date string, converting common formats to the Canadian standard YYYY-MM-DD (ISO 8601).
 
 ```python
-clean_postalcode.clean_postalcode(postal_code)
+clean_postalcode(postal_code)
 ```
 This function cleans and validates a Canadian postal code string field to ensure that it matches the Canadian postal code format (e.g., "A1A 1A1").
 
 ```python
-clean_location.clean_location(location)
+clean_location(location)
 ```
 This function cleans and validates a free-text entry representing Canadian province or territory and returns the two letter province or territory code, e.g. "BC" for "British Columbia".
 
 ```python
-clean_phonenumber.clean_phonenumber(phone_number)
+clean_phonenumber(phone_number)
 ```
-This function cleans and validates a phone number string field to ensure that it matches the Canadian phone number format.
+This function cleans and validates a phone number string field to ensure that it matches the Canadian phone number format ("+1 (XXX) XXX-XXXX").
 
 ## Where This Fits in the Python Ecosystem
 
